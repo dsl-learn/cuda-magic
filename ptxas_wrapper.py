@@ -146,14 +146,20 @@ def _reserve_dest(entry, arch):
     return dest
 
 
+def _has_kernel_entry(p: Path) -> bool:
+    try:
+        return bool(re.search(r'\\.visible\\s+\\.entry', p.read_text(encoding='utf-8', errors='ignore')))
+    except OSError:
+        return False
+
 args = sys.argv[1:]
-ptx  = next((Path(a) for a in args if a.endswith('.ptx') and Path(a).exists()), None)
+ptx  = next((Path(a) for a in args if a.endswith('.ptx') and Path(a).exists() and _has_kernel_entry(Path(a))), None)
 if ptx:
     arch = _normalize_arch(_find_arch(args))
     entry = _find_entry_name(ptx)
     dest = _reserve_dest(entry, arch)
     shutil.copy2(ptx, dest)
-    print(f'[ptxas-intercept] saved: {{dest}}')
+    print(f'[ptxas-intercept] saved: {{dest}}', file=sys.stderr, flush=True)
 
 os.execv(str(REAL), [str(REAL)] + args)
 """
