@@ -161,9 +161,9 @@ if ptx:
     shutil.copy2(ptx, dest)
     try:
         with open('/dev/tty', 'w') as _tty:
-            print(f'[ptxas-intercept] saved: {{dest}}', file=_tty, flush=True)
+            print(f'[ptxas-wrapper] saved: {{dest}} with /dev/tty', file=_tty, flush=True)
     except OSError:
-        print(f'[ptxas-intercept] saved: {{dest}}', file=sys.stderr, flush=True)
+        print(f'[ptxas-wrapper] saved: {{dest}}', file=sys.stderr, flush=True)
 
 os.execv(str(REAL), [str(REAL)] + args)
 """
