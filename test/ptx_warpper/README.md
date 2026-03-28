@@ -7,7 +7,6 @@ Test for intercepting `ptxas` invocations and capturing PTX inputs across multip
 ```shell
 git clone https://github.com/dsl-learn/cuda-magic.git
 cd cuda-magic
-git clone https://github.com/NVIDIA/cutlass.git
 ```
 
 ## Install packages
@@ -54,9 +53,14 @@ nvcc test/ptx_warpper/vec_add_cuda.cu -o /tmp/vec_add_cuda -arch=sm_75
 ```
 
 **CUTLASS C++**
+
+Requires the CUTLASS source tree:
+```shell
+git clone https://github.com/NVIDIA/cutlass.git
+```
+
 ```shell
 python3 ptxas_wrapper.py install
-
 nvcc test/ptx_warpper/vec_add_cutlass.cu -o /tmp/vec_add_cutlass \
     -I./cutlass/include \
     -I./cutlass/tools/util/include
