@@ -59,6 +59,14 @@ def _find_ptxas() -> Path:
     sys.exit("ERROR: ptxas not found (make sure tileiras or ptxas is in PATH)")
 
 
+def _resolve_ptxas(override: str | None = None) -> Path:
+    if override:
+        p = Path(override).resolve()
+        if not p.exists():
+            sys.exit(f"ERROR: ptxas not found at {override}")
+        return p
+    return _find_ptxas()
+
 PTXAS = _find_ptxas()
 PTXAS_REAL = PTXAS.with_suffix(".real")
 DEFAULT_DUMP_DIR = Path(__file__).parent / "ptx_dumps"
@@ -291,7 +299,11 @@ if __name__ == "__main__":
         cutedsl(sys.argv[2:])
     elif cmd == "triton":
         triton(sys.argv[2:])
+    elif cmd in ("install", "uninstall", "status"):
+        # Optional: ptxas_wrapper.py <cmd> [/path/to/ptxas]
+        ptxas_override = sys.argv[2] if len(sys.argv) > 2 else None
+        PTXAS = _resolve_ptxas(ptxas_override)
+        PTXAS_REAL = PTXAS.with_suffix(".real")
+        {"install": install, "uninstall": uninstall, "status": status}[cmd]()
     else:
-        {"install": install, "uninstall": uninstall, "status": status}.get(
-            cmd, lambda: sys.exit(f"Usage: {sys.argv[0]} {{install|uninstall|status|cutedsl|triton}}")
-        )()
+        sys.exit(f"Usage: {sys.argv[0]} {{install|uninstall|status|cutedsl|triton}} [ptxas_path]")
