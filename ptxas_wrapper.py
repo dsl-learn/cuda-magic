@@ -11,6 +11,7 @@ Environment variables:
 """
 
 import os
+import re
 import sys
 import shutil
 from pathlib import Path
@@ -161,9 +162,9 @@ if ptx:
     shutil.copy2(ptx, dest)
     try:
         with open('/dev/tty', 'w') as _tty:
-            print(f'[ptxas-wrapper] saved: {{dest}} with /dev/tty', file=_tty, flush=True)
+            print(f'[ptxas-wrapper] saved: {{dest}} with /dev/tty in ptxas', file=_tty, flush=True)
     except OSError:
-        print(f'[ptxas-wrapper] saved: {{dest}}', file=sys.stderr, flush=True)
+        print(f'[ptxas-wrapper] saved: {{dest}} in ptxas', file=sys.stderr, flush=True)
 
 os.execv(str(REAL), [str(REAL)] + args)
 """
@@ -241,6 +242,27 @@ def _host_reserve_dest(dump_dir: Path, entry: str, arch: str) -> Path:
     return dest
 
 
+def triton(script_args: list[str]):
+    """Run a triton script and collect PTX files from its cache into DEFAULT_DUMP_DIR."""
+    if not script_args:
+        sys.exit("Usage: ptxas_wrapper.py triton <script.py> [args...]")
+    import subprocess, tempfile
+    dump_dir = Path(os.environ.get("PTX_DUMP_DIR", DEFAULT_DUMP_DIR))
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        env = os.environ.copy()
+        env["TRITON_CACHE_DIR"] = tmp
+        result = subprocess.run([sys.executable] + script_args, env=env)
+        for raw in sorted(Path(tmp).rglob("*.ptx")):
+            arch_m = re.search(r'sm_\d+', raw.read_text(encoding='utf-8', errors='ignore'))
+            arch_part = arch_m.group(0) if arch_m else 'sm_unknown'
+            entry = re.sub(r'[^0-9A-Za-z_.-]+', '_', raw.stem)[:30]
+            dest = _host_reserve_dest(dump_dir, entry, arch_part)
+            shutil.copy2(raw, dest)
+            print(f"[ptxas-wrapper] saved: {dest} in Triton")
+    sys.exit(result.returncode)
+
+
 def cutedsl(script_args: list[str]):
     """Run a script with CUTE_DSL_KEEP_PTX enabled, dumping PTX to DEFAULT_DUMP_DIR."""
     if not script_args:
@@ -259,7 +281,7 @@ def cutedsl(script_args: list[str]):
             entry = _host_find_entry_name(raw)[:30]
             dest = _host_reserve_dest(dump_dir, entry, arch_part)
             shutil.move(str(raw), dest)
-            print(f"[ptxas-wrapper] saved: {dest}")
+            print(f"[ptxas-wrapper] saved: {dest} in CuteDSL")
     sys.exit(result.returncode)
 
 
@@ -267,7 +289,9 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "cutedsl":
         cutedsl(sys.argv[2:])
+    elif cmd == "triton":
+        triton(sys.argv[2:])
     else:
         {"install": install, "uninstall": uninstall, "status": status}.get(
-            cmd, lambda: sys.exit(f"Usage: {sys.argv[0]} {{install|uninstall|status|cutedsl}}")
+            cmd, lambda: sys.exit(f"Usage: {sys.argv[0]} {{install|uninstall|status|cutedsl|triton}}")
         )()

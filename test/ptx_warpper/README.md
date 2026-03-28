@@ -5,9 +5,11 @@ Test for intercepting `ptxas` invocations triggered by `cuda.tile` and capturing
 ## Usage
 
 ```shell
-CUDA_TILE_CACHE_DIR=0 python3 test/ptx_warpper/cutile.py
+CUDA_TILE_CACHE_DIR=0 python3 test/ptx_warpper/vec_add_cutile.py
 
-python3 ptxas_wrapper.py cutedsl test/ptx_warpper/cutedsl.py
+python3 ptxas_wrapper.py cutedsl test/ptx_warpper/vec_add_cutedsl.py
+
+python3 ptxas_wrapper.py triton test/ptx_warpper/vec_add_triton.py
 ```
 
 ## install package
@@ -18,4 +20,5 @@ pip install cuda-tile[tileiras]
 
 pip install nvidia-cutlass-dsl
 
+pip install triton
 ```
