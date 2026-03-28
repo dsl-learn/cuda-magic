@@ -10,6 +10,8 @@ CUDA_TILE_CACHE_DIR=0 python3 test/ptx_warpper/vec_add_cutile.py
 python3 ptxas_wrapper.py cutedsl test/ptx_warpper/vec_add_cutedsl.py
 
 python3 ptxas_wrapper.py triton test/ptx_warpper/vec_add_triton.py
+
+nvcc test/ptx_warpper/vec_add_cuda.cu -o /tmp/vec_add_cuda_example
 ```
 
 ## install package
