@@ -21,6 +21,23 @@ cuda_nvcc-linux-x86_64-12.8.93-archive/bin/ptxas -lineinfo -v --gpu-name=sm_100a
 
 You can use `ls -lh` to check the sizes of different .cubin files.
 
+## PTXAS Wrapper
+
+[`ptxas_wrapper.py`](./ptxas_wrapper.py) is a small helper for capturing the PTX that different CUDA frontends eventually hand to `ptxas`. By default it writes dumps to [`ptx_dumps/`](./ptx_dumps/), and you can override that location with `PTX_DUMP_DIR=/your/path`.
+
+It supports two capture modes:
+
+- `python3 ptxas_wrapper.py install [ptxas_path]` replaces the discovered `ptxas` with a thin wrapper and keeps the original binary as `ptxas.real`. This is the mode to use for direct `ptxas` callers such as `nvcc` or `tileiras`.
+- `python3 ptxas_wrapper.py triton <script.py>` and `python3 ptxas_wrapper.py cutedsl <script.py>` run the target script with framework-specific dump settings, then collect the generated `.ptx` files into `ptx_dumps/`.
+
+Useful commands:
+
+```bash
+python3 ptxas_wrapper.py status
+python3 ptxas_wrapper.py install
+python3 ptxas_wrapper.py uninstall
+```
+
 ## Minimal Example
 
 The minimal PTX that reproduces the behavior is in [`minimal_example/`](./minimal_example/). The two files are **identical** except for the function name (`cutlass_kernel` vs `plain_kernel`).
