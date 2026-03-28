@@ -118,10 +118,10 @@ def _find_entry_name(ptx):
         text = ptx.read_text(encoding='utf-8', errors='ignore')
     except OSError:
         return ptx.stem
-    m = re.search(r'\\.visible\\s+\\.entry\\s+([^\\s(]+)', text)
+    m = re.search(r'(\\.visible\\s+)?\\.entry\\s+([^\\s(]+)', text)
     if not m:
         return ptx.stem
-    return re.sub(r'[^0-9A-Za-z_.-]+', '_', m.group(1))
+    return re.sub(r'[^0-9A-Za-z_.-]+', '_', m.group(2))
 
 
 def _reserve_dest(entry, arch):
@@ -157,7 +157,7 @@ def _reserve_dest(entry, arch):
 
 def _has_kernel_entry(p: Path) -> bool:
     try:
-        return bool(re.search(r'\\.visible\\s+\\.entry', p.read_text(encoding='utf-8', errors='ignore')))
+        return bool(re.search(r'(\\.visible\\s+)?\\.entry\\s+', p.read_text(encoding='utf-8', errors='ignore')))
     except OSError:
         return False
 
