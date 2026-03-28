@@ -256,9 +256,9 @@ def cutedsl(script_args: list[str]):
         result = subprocess.run([sys.executable] + script_args, env=env)
         for raw in sorted(Path(tmp).glob("*.ptx")):
             arch_part = raw.stem.rsplit('.', 1)[-1] if '.' in raw.stem else 'sm_unknown'
-            entry = _host_find_entry_name(raw)
+            entry = _host_find_entry_name(raw)[:30]
             dest = _host_reserve_dest(dump_dir, entry, arch_part)
-            shutil.copy2(raw, dest)
+            shutil.move(str(raw), dest)
             print(f"[ptxas-wrapper] saved: {dest}")
     sys.exit(result.returncode)
 
