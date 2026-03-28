@@ -198,8 +198,29 @@ def status():
         print(f"  ptx files: {len(ptx_files)}")
 
 
+def cutedsl(script_args: list[str]):
+    """Run a script with CUTE_DSL_KEEP_PTX enabled, dumping PTX to DEFAULT_DUMP_DIR."""
+    if not script_args:
+        sys.exit("Usage: ptxas_wrapper.py cutedsl <script.py> [args...]")
+    dump_dir = Path(os.environ.get("PTX_DUMP_DIR", DEFAULT_DUMP_DIR))
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env["CUTE_DSL_KEEP_PTX"] = "1"
+    env["CUTE_DSL_NO_CACHE"] = "1"
+    env["CUTE_DSL_DUMP_DIR"] = str(dump_dir)
+    import subprocess
+    result = subprocess.run([sys.executable] + script_args, env=env)
+    ptx_files = sorted(dump_dir.glob("*.ptx"))
+    for p in ptx_files:
+        print(f"[ptxas-wrapper] saved: {p}")
+    sys.exit(result.returncode)
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    {"install": install, "uninstall": uninstall, "status": status}.get(
-        cmd, lambda: sys.exit(f"Usage: {sys.argv[0]} {{install|uninstall|status}}")
-    )()
+    if cmd == "cutedsl":
+        cutedsl(sys.argv[2:])
+    else:
+        {"install": install, "uninstall": uninstall, "status": status}.get(
+            cmd, lambda: sys.exit(f"Usage: {sys.argv[0]} {{install|uninstall|status|cutedsl}}")
+        )()
