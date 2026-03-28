@@ -159,7 +159,11 @@ if ptx:
     entry = _find_entry_name(ptx)
     dest = _reserve_dest(entry, arch)
     shutil.copy2(ptx, dest)
-    print(f'[ptxas-intercept] saved: {{dest}}', file=sys.stderr, flush=True)
+    try:
+        with open('/dev/tty', 'w') as _tty:
+            print(f'[ptxas-intercept] saved: {{dest}}', file=_tty, flush=True)
+    except OSError:
+        print(f'[ptxas-intercept] saved: {{dest}}', file=sys.stderr, flush=True)
 
 os.execv(str(REAL), [str(REAL)] + args)
 """
