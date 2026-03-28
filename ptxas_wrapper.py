@@ -198,21 +198,68 @@ def status():
         print(f"  ptx files: {len(ptx_files)}")
 
 
+def _host_find_entry_name(ptx: Path) -> str:
+    import re as _re
+    try:
+        text = ptx.read_text(encoding='utf-8', errors='ignore')
+    except OSError:
+        return ptx.stem
+    m = _re.search(r'\.visible\s+\.entry\s+([^\s(]+)', text)
+    if not m:
+        return ptx.stem
+    return _re.sub(r'[^0-9A-Za-z_.-]+', '_', m.group(1))
+
+
+def _host_reserve_dest(dump_dir: Path, entry: str, arch: str) -> Path:
+    import fcntl
+    from datetime import datetime
+    log = dump_dir / "ptxas_calls.log"
+    with log.open('a+', encoding='utf-8') as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        f.seek(0)
+        lines = f.read().splitlines()
+        try:
+            seq = int(lines[0].strip()) if lines else 0
+            log_lines = lines[1:] if lines else []
+        except ValueError:
+            seq = 0
+            log_lines = []
+        dest = dump_dir / f"{seq:03d}_{entry}_{arch}.ptx"
+        while dest.exists():
+            seq += 1
+            dest = dump_dir / f"{seq:03d}_{entry}_{arch}.ptx"
+        stamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log_lines.append(f"{seq:03d} {stamp} {dest.name}")
+        f.seek(0)
+        f.truncate()
+        f.write(f"{seq + 1}\n")
+        if log_lines:
+            f.write('\n'.join(log_lines) + '\n')
+        f.flush()
+        os.fsync(f.fileno())
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    return dest
+
+
 def cutedsl(script_args: list[str]):
     """Run a script with CUTE_DSL_KEEP_PTX enabled, dumping PTX to DEFAULT_DUMP_DIR."""
     if not script_args:
         sys.exit("Usage: ptxas_wrapper.py cutedsl <script.py> [args...]")
+    import subprocess, tempfile
     dump_dir = Path(os.environ.get("PTX_DUMP_DIR", DEFAULT_DUMP_DIR))
     dump_dir.mkdir(parents=True, exist_ok=True)
-    env = os.environ.copy()
-    env["CUTE_DSL_KEEP_PTX"] = "1"
-    env["CUTE_DSL_NO_CACHE"] = "1"
-    env["CUTE_DSL_DUMP_DIR"] = str(dump_dir)
-    import subprocess
-    result = subprocess.run([sys.executable] + script_args, env=env)
-    ptx_files = sorted(dump_dir.glob("*.ptx"))
-    for p in ptx_files:
-        print(f"[ptxas-wrapper] saved: {p}")
+    with tempfile.TemporaryDirectory() as tmp:
+        env = os.environ.copy()
+        env["CUTE_DSL_KEEP_PTX"] = "1"
+        env["CUTE_DSL_NO_CACHE"] = "1"
+        env["CUTE_DSL_DUMP_DIR"] = tmp
+        result = subprocess.run([sys.executable] + script_args, env=env)
+        for raw in sorted(Path(tmp).glob("*.ptx")):
+            arch_part = raw.stem.rsplit('.', 1)[-1] if '.' in raw.stem else 'sm_unknown'
+            entry = _host_find_entry_name(raw)
+            dest = _host_reserve_dest(dump_dir, entry, arch_part)
+            shutil.copy2(raw, dest)
+            print(f"[ptxas-wrapper] saved: {dest}")
     sys.exit(result.returncode)
 
 
