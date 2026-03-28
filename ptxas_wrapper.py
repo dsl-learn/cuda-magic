@@ -2,9 +2,9 @@
 """ptxas wrapper that intercepts tileiras-invoked ptxas calls and saves PTX inputs.
 
 Usage:
-    python intercept_ptxas.py install    # Install the wrapper
-    python intercept_ptxas.py uninstall  # Restore the original binary
-    python intercept_ptxas.py status     # Show current status
+    python ptxas_wrapper.py install    # Install the wrapper
+    python ptxas_wrapper.py uninstall  # Restore the original binary
+    python ptxas_wrapper.py status     # Show current status
 
 Environment variables:
     PTX_DUMP_DIR  PTX dump directory, default: ./ptx_dumps
@@ -162,9 +162,9 @@ if ptx:
     shutil.copy2(ptx, dest)
     try:
         with open('/dev/tty', 'w') as _tty:
-            print(f'[ptxas-wrapper] saved: {{dest}} with /dev/tty in ptxas', file=_tty, flush=True)
+            print(f'[ptxas-wrapper] saved: {{dest}} (ptxas: {{sys.argv[0]}}) with /dev/tty', file=_tty, flush=True)
     except OSError:
-        print(f'[ptxas-wrapper] saved: {{dest}} in ptxas', file=sys.stderr, flush=True)
+        print(f'[ptxas-wrapper] saved: {{dest}} (ptxas: {{sys.argv[0]}})', file=sys.stderr, flush=True)
 
 os.execv(str(REAL), [str(REAL)] + args)
 """
