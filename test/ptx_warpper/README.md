@@ -12,8 +12,8 @@ cd cuda-magic
 ## Install packages
 
 ```shell
-pip install cuda-tile
 pip install cuda-tile[tileiras]
+# pip install cuda-tile
 pip install nvidia-cutlass-dsl
 pip install triton
 ```
@@ -28,6 +28,8 @@ In this test directory, the wrapper is used in two ways:
 - `install` swaps the discovered `ptxas` with a shim, which is useful for flows that call `ptxas` directly, such as `nvcc`.
 
 Captured PTX files are written to `./ptx_dumps/` by default, or to `PTX_DUMP_DIR` when that environment variable is set.
+
+For `nvcc`-based flows, `install` requires the ptxas path explicitly (e.g. `/usr/local/cuda/bin/ptxas`) since nvcc may use a different ptxas than the one auto-detected.
 
 ## Usage
 
@@ -48,8 +50,9 @@ python3 ptxas_wrapper.py triton test/ptx_warpper/vec_add_triton.py
 
 **CUDA C++ (via nvcc + ptxas wrapper)**
 ```shell
-python3 ptxas_wrapper.py install
+sudo python3 ptxas_wrapper.py install
 nvcc test/ptx_warpper/vec_add_cuda.cu -o /tmp/vec_add_cuda -arch=sm_75
+sudo python3 ptxas_wrapper.py uninstall
 ```
 
 **CUTLASS C++**
@@ -60,8 +63,9 @@ git clone https://github.com/NVIDIA/cutlass.git
 ```
 
 ```shell
-python3 ptxas_wrapper.py install
+sudo python3 ptxas_wrapper.py install
 nvcc test/ptx_warpper/vec_add_cutlass.cu -o /tmp/vec_add_cutlass \
     -I./cutlass/include \
     -I./cutlass/tools/util/include
+sudo python3 ptxas_wrapper.py uninstall
 ```
