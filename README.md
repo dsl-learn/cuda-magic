@@ -38,6 +38,8 @@ python3 ptxas_wrapper.py install
 python3 ptxas_wrapper.py uninstall
 ```
 
+See [`example/ptx_warpper/`](./example/ptx_warpper/README.md) for end-to-end examples covering cuda.tile, CuteDSL, Triton, and CUDA/CUTLASS C++.
+
 ## Minimal Example
 
 The minimal PTX that reproduces the behavior is in [`minimal_example/`](./minimal_example/). The two files are **identical** except for the function name (`cutlass_kernel` vs `plain_kernel`).
