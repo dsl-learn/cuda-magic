@@ -1,26 +1,52 @@
 # PTX Wrapper Test
 
-Test for intercepting `ptxas` invocations triggered by `cuda.tile` and capturing the PTX inputs.
+Test for intercepting `ptxas` invocations and capturing PTX inputs across multiple CUDA frameworks.
+
+## Setup
+
+```shell
+git clone https://github.com/dsl-learn/cuda-magic.git
+cd cuda-magic
+git clone https://github.com/NVIDIA/cutlass.git
+```
+
+## Install packages
+
+```shell
+pip install cuda-tile
+pip install cuda-tile[tileiras]
+pip install nvidia-cutlass-dsl
+pip install triton
+```
 
 ## Usage
 
+**cuda.tile**
 ```shell
 CUDA_TILE_CACHE_DIR=0 python3 test/ptx_warpper/vec_add_cutile.py
-
-python3 ptxas_wrapper.py cutedsl test/ptx_warpper/vec_add_cutedsl.py
-
-python3 ptxas_wrapper.py triton test/ptx_warpper/vec_add_triton.py
-
-nvcc test/ptx_warpper/vec_add_cuda.cu -o /tmp/vec_add_cuda_example
 ```
 
-## install package
+**CuteDSL (cutlass DSL)**
 ```shell
-pip install cuda-tile
+python3 ptxas_wrapper.py cutedsl test/ptx_warpper/vec_add_cutedsl.py
+```
 
-pip install cuda-tile[tileiras]
+**Triton**
+```shell
+python3 ptxas_wrapper.py triton test/ptx_warpper/vec_add_triton.py
+```
 
-pip install nvidia-cutlass-dsl
+**CUDA C++ (via nvcc + ptxas wrapper)**
+```shell
+python3 ptxas_wrapper.py install
+nvcc test/ptx_warpper/vec_add_cuda.cu -o /tmp/vec_add_cuda -arch=sm_75
+```
 
-pip install triton
+**CUTLASS C++**
+```shell
+python3 ptxas_wrapper.py install
+
+nvcc test/ptx_warpper/vec_add_cutlass.cu -o /tmp/vec_add_cutlass \
+    -I./cutlass/include \
+    -I./cutlass/tools/util/include
 ```
