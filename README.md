@@ -66,8 +66,6 @@ Notably, removing the warp predicate (`@%p0`) from `tcgen05.mma` causes ptxas it
 
 [`5090_tma_mem_blackhole.py`](./5090_tma_mem_blackhole.py) reproduces another Blackwell-specific issue: on RTX 5090, enabling Triton TMA (`tl.make_tensor_descriptor`) can add **~3.7 GiB** of device memory usage compared with a plain `tl.load` / `tl.store` kernel, even though PyTorch reports the same allocator state in both cases.
 
-Detailed notes are in [`显存黑洞.md`](./显存黑洞.md).
-
 Run the two variants in **fresh processes**:
 
 ```bash
