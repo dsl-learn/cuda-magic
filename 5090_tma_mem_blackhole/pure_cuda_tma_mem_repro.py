@@ -110,9 +110,10 @@ def plain_kernel(src_ptr, dst_ptr, N: tl.constexpr,
 
 # --------------------------------------------------------------------------- #
 # tma_cta : tl.make_tensor_descriptor, single-CTA launch.
-# On current Triton main this lowers to
+# On current Triton main(eb5efe2) this lowers to
 #   cp.async.bulk.tensor.2d.shared::cta.global.tile.mbarrier::complete_tx::bytes
-# (see third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/LoadStoreOpToLLVM.cpp:1253,
+# (see https://github.com/triton-lang/triton/blob/main/third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/LoadStoreOpToLLVM.cpp#L1253,
+# related https://github.com/triton-lang/triton/blob/f1d668bfc/third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/LoadStoreOpToLLVM.cpp#L1418
 # shared::cta is chosen when neither multicast nor crossCTABarrier hold).
 # --------------------------------------------------------------------------- #
 @triton.jit
