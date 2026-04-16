@@ -31,10 +31,10 @@ Modes (mapped to pure_cuda_tma_mem_repro.cu rows):
                   ~3.7 GiB syscall buffer (the black hole itself)
 
 Usage:
-  python tma_black_hole_probe.py --mode plain          2>&1 | tee plain.log
-  python tma_black_hole_probe.py --mode tma_cta        2>&1 | tee tma_cta.log
-  python tma_black_hole_probe.py --mode tma_gluon_cta  2>&1 | tee tma_gluon.log
-  python tma_black_hole_probe.py --mode tma_multicast  2>&1 | tee tma_mc.log
+  python gluon_tma_copy.py --mode plain          2>&1 | tee plain.log
+  python gluon_tma_copy.py --mode tma_cta        2>&1 | tee tma_cta.log
+  python gluon_tma_copy.py --mode tma_gluon_cta  2>&1 | tee tma_gluon.log
+  python gluon_tma_copy.py --mode tma_multicast  2>&1 | tee tma_mc.log
 
 Compare the 'nvml Δ vs baseline' line across logs:
   tma_gluon_cta  ≈ plain          (safe — no syscall buffer)
