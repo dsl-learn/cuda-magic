@@ -1,10 +1,18 @@
 import os
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 CACHE_ROOT = Path(__file__).parent / "tilelang_cache"
 CACHE_ROOT.mkdir(exist_ok=True)
 os.environ.setdefault('TILELANG_CACHE_DIR', str(CACHE_ROOT))
+
 import tilelang
 import tilelang.language as T
+
 
 @tilelang.jit(out_idx=[-1])
 def mean_center(M, N, block_M, block_N, dtype):

@@ -39,7 +39,7 @@ cmake-build-*
 .DS_Store
 
 ptx_dumps/
-5090_tma_mem_blackhole/cute_cache/
+*_cache/
 *.log
 *.ptx
 *.cubin

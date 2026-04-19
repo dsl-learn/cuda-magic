@@ -16,55 +16,22 @@ Expected shape if the hypothesis holds:
   B (compiled)   : free drops ~3.7 GiB    <-- leak appears here
   C (launched)   : no further drop
   D (del+gc+empty_cache) : **free unchanged** (the tell)
-  E (ipc_collect): still u
-  nchanged
+  E (ipc_collect): still unchanged
 """
 
 import gc
 import os
-import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
 
+ROOT = Path(__file__).parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import torch
-
-
-MiB = 1024 * 1024
-
-
-def smi_used_mb() -> float:
-    pid = os.getpid()
-    try:
-        out = subprocess.check_output(
-            ["nvidia-smi",
-             "--query-compute-apps=pid,used_memory",
-             "--format=csv,noheader,nounits"],
-            stderr=subprocess.DEVNULL,
-        ).decode()
-    except Exception:
-        return float("nan")
-    for line in out.strip().splitlines():
-        parts = [p.strip() for p in line.split(",")]
-        if parts and parts[0] == str(pid):
-            return float(parts[1])
-    return 0.0
-
-
-def snapshot(tag: str) -> None:
-    free, total = torch.cuda.mem_get_info()
-    used_by_driver = (total - free) / MiB
-    smi_used = smi_used_mb()
-    torch_alloc = torch.cuda.memory_allocated() / MiB
-    torch_resv = torch.cuda.memory_reserved() / MiB
-    print(
-        f"[{tag:<24}] "
-        f"free={free/MiB:8.1f} MiB  "
-        f"driver_used={used_by_driver:8.1f} MiB  "
-        f"smi_pid_used={smi_used:8.1f} MiB  "
-        f"torch_alloc={torch_alloc:7.1f} MiB  "
-        f"torch_reserved={torch_resv:7.1f} MiB"
-    )
+from common.mem_utils import snapshot, smi_used_mb
 
 
 def main():
@@ -86,7 +53,7 @@ def main():
         mj, mn = torch.cuda.get_device_capability(0)
         os.environ["CUTE_DSL_ARCH"] = f"sm_{mj}{mn}"
 
-    from cute_tma_copy import TmaIdentityCopy
+    from cutedsl.cute_tma_copy import TmaIdentityCopy
     import cutlass.cute as cute
     from cutlass.cute.runtime import from_dlpack
 

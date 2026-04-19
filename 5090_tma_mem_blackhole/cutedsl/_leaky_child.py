@@ -1,10 +1,16 @@
 
 import os, sys, time
 from pathlib import Path
+
+# _leaky_child.py lives in cutedsl/, so repo root is its grandparent.
+repo = Path(__file__).parent.parent
+if str(repo) not in sys.path:
+    sys.path.insert(0, str(repo))
+
 import torch
 
-CACHE_ROOT = Path(__file__).parent / "cute_cache"
-CACHE_ROOT.mkdir(exist_ok=True)
+CACHE_ROOT = repo / "cutedsl" / "cute_cache"
+CACHE_ROOT.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("CUTE_DSL_CACHE_DIR", str(CACHE_ROOT / "mlir_cache"))
 os.environ.setdefault("CUTE_DSL_DUMP_DIR", str(CACHE_ROOT))
 os.environ.setdefault("CUTE_DSL_KEEP_CUBIN", "1")
@@ -18,7 +24,7 @@ torch.cuda.synchronize()
 print(f"CHILD_PID={os.getpid()}", flush=True)
 print("CTX_READY", flush=True)
 
-from cute_tma_copy import TmaIdentityCopy
+from cutedsl.cute_tma_copy import TmaIdentityCopy
 import cutlass.cute as cute
 from cutlass.cute.runtime import from_dlpack
 

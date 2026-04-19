@@ -28,20 +28,31 @@ import sys
 import time
 from pathlib import Path
 
-HERE = Path(__file__).parent
+ROOT = Path(__file__).parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
+from common.mem_utils import free_mib, used_by_pid
+from common.proc_utils import wait_line, iso_sample
 
-CHILD_SCRIPT = HERE / "_leaky_child.py"
+HERE = Path(__file__).parent.parent  # repo root
+CHILD_SCRIPT = Path(__file__).parent / "_leaky_child.py"  # put child script inside cutedsl/
 
 
 def write_child():
     CHILD_SCRIPT.write_text(r'''
 import os, sys, time
 from pathlib import Path
+
+# _leaky_child.py lives in cutedsl/, so repo root is its grandparent.
+repo = Path(__file__).parent.parent
+if str(repo) not in sys.path:
+    sys.path.insert(0, str(repo))
+
 import torch
 
-CACHE_ROOT = Path(__file__).parent / "cute_cache"
-CACHE_ROOT.mkdir(exist_ok=True)
+CACHE_ROOT = repo / "cutedsl" / "cute_cache"
+CACHE_ROOT.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("CUTE_DSL_CACHE_DIR", str(CACHE_ROOT / "mlir_cache"))
 os.environ.setdefault("CUTE_DSL_DUMP_DIR", str(CACHE_ROOT))
 os.environ.setdefault("CUTE_DSL_KEEP_CUBIN", "1")
@@ -55,7 +66,7 @@ torch.cuda.synchronize()
 print(f"CHILD_PID={os.getpid()}", flush=True)
 print("CTX_READY", flush=True)
 
-from cute_tma_copy import TmaIdentityCopy
+from cutedsl.cute_tma_copy import TmaIdentityCopy
 import cutlass.cute as cute
 from cutlass.cute.runtime import from_dlpack
 
@@ -76,44 +87,6 @@ print("LAUNCHED", flush=True)
 while True:
     time.sleep(3600)
 ''')
-
-
-def free_mib() -> float:
-    out = subprocess.check_output(
-        ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
-        stderr=subprocess.DEVNULL,
-    ).decode().strip().splitlines()[0]
-    return float(out)
-
-
-def used_by_pid(pid: int) -> float:
-    out = subprocess.check_output(
-        ["nvidia-smi",
-         "--query-compute-apps=pid,used_memory",
-         "--format=csv,noheader,nounits"],
-        stderr=subprocess.DEVNULL,
-    ).decode()
-    for ln in out.strip().splitlines():
-        parts = [p.strip() for p in ln.split(",")]
-        if parts and parts[0] == str(pid):
-            return float(parts[1])
-    return 0.0
-
-
-def wait_line(proc: subprocess.Popen, needle: str, timeout: float) -> str:
-    """Read child stdout until a line starts with needle, or timeout."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        line = proc.stdout.readline()
-        if not line:
-            if proc.poll() is not None:
-                raise RuntimeError(f"child died early before '{needle}'")
-            continue
-        line = line.strip()
-        print(f"  child> {line}")
-        if line.startswith(needle):
-            return line
-    raise TimeoutError(f"waiting for '{needle}' timed out")
 
 
 def sample(tag: str, pid: int | None = None) -> None:

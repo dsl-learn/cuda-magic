@@ -24,26 +24,13 @@ also:
 We check all three and report.
 """
 
-import subprocess
-import sqlite3
 import time
+import sys
 from pathlib import Path
 
-
-def _cuobjdump() -> str:
-    """Resolve cuobjdump. Prefer the one Triton's nvidia backend ships with."""
-    import shutil
-    try:
-        import triton  # noqa: F401
-        p = Path(triton.__file__).parent / "backends" / "nvidia" / "bin" / "cuobjdump"
-        if p.exists():
-            return str(p)
-    except ImportError:
-        pass
-    return shutil.which("cuobjdump") or "/usr/local/cuda/bin/cuobjdump"
-
-
-CUOBJDUMP = _cuobjdump()
+ROOT = Path(__file__).parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 CACHE_ROOT = Path(__file__).parent / "cutile_cache"
 CACHE_ROOT.mkdir(exist_ok=True)
@@ -60,6 +47,9 @@ ConstInt = ct.Constant[int]
 TILE_M = 128
 TILE_N = 128
 
+from common.cuda_utils import resolve_cuobjdump, dump_cubins, analyze_cubin
+from common.mem_utils import snapshot
+
 
 @ct.kernel
 def tma_mean_center_2d(src, dst, TM: ConstInt, TN: ConstInt):
@@ -70,61 +60,6 @@ def tma_mean_center_2d(src, dst, TM: ConstInt, TN: ConstInt):
     s = ct.sum(t, axis=1)                          # (TM,)
     out = t - ct.expand_dims(s, axis=1) / TN       # broadcast back
     ct.store(dst, index=(bidx, bidy), tile=out.astype(t.dtype))
-
-
-def snapshot(tag: str) -> None:
-    free, total = torch.cuda.mem_get_info()
-    driver_used = (total - free) / MiB
-    torch_alloc = torch.cuda.memory_allocated() / MiB
-    print(
-        f"[{tag:<22}] free={free/MiB:8.1f} MiB  "
-        f"driver_used={driver_used:8.1f} MiB  "
-        f"torch_alloc={torch_alloc:6.1f} MiB"
-    )
-
-
-def dump_cubins_from_db(db_path: Path, out_dir: Path) -> list[Path]:
-    out_dir.mkdir(exist_ok=True)
-    paths: list[Path] = []
-    if not db_path.exists():
-        return paths
-    conn = sqlite3.connect(db_path)
-    try:
-        cur = conn.execute("SELECT key, blob FROM cache")
-        for i, (key, blob) in enumerate(cur.fetchall()):
-            if not blob[:4] == b"\x7fELF":
-                continue
-            p = out_dir / f"blob_{i}_{key[:12]}.cubin"
-            p.write_bytes(blob)
-            paths.append(p)
-    finally:
-        conn.close()
-    return paths
-
-
-def analyze_cubin(path: Path) -> dict:
-    syms = subprocess.check_output(
-        [CUOBJDUMP, "--dump-elf-symbols", str(path)],
-        stderr=subprocess.STDOUT,
-    ).decode("utf-8", errors="replace")
-    syscall_hits = [l.strip() for l in syms.splitlines() if "cuda_syscall" in l]
-
-    sass = subprocess.check_output(
-        [CUOBJDUMP, "--dump-sass", str(path)],
-        stderr=subprocess.STDOUT,
-    ).decode("utf-8", errors="replace")
-
-    def ct_line(needle: str) -> int:
-        return sum(1 for l in sass.splitlines() if needle in l)
-
-    return {
-        "UTMALDG":   ct_line("UTMALDG"),
-        "UBLKCP":    ct_line("UBLKCP"),
-        "CALL.ABS":  ct_line("CALL.ABS.NOINC"),
-        "LDG.E":     ct_line(" LDG.E"),
-        "STG.E":     ct_line(" STG.E"),
-        "syscalls":  syscall_hits,
-    }
 
 
 def main() -> None:
@@ -172,21 +107,22 @@ def main() -> None:
 
     print("\n=== cubin analysis ===")
     dump_dir = CACHE_ROOT / "_dumped"
-    paths = dump_cubins_from_db(CACHE_ROOT / "cache.db", dump_dir)
+    paths = dump_cubins(CACHE_ROOT / "cache.db", dump_dir)
     print(f"dumped {len(paths)} cubin(s) from cache.db")
     verdict_tma = False
     verdict_clean = True
+    cuobjdump_path = resolve_cuobjdump()
     for p in paths:
-        r = analyze_cubin(p)
+        r = analyze_cubin(p, cuobjdump_path=cuobjdump_path)
         print(f"\n{p.name}")
         print(f"  UTMALDG.*:      {r['UTMALDG']}")
         print(f"  UBLKCP.*:       {r['UBLKCP']}")
-        print(f"  CALL.ABS.NOINC: {r['CALL.ABS']}")
-        print(f"  LDG.E:          {r['LDG.E']}")
-        print(f"  STG.E:          {r['STG.E']}")
-        if r["syscalls"]:
-            print(f"  ELF syscall refs ({len(r['syscalls'])}):")
-            for h in r["syscalls"][:5]:
+        print(f"  CALL.ABS.NOINC: {r['CALL_ABS']}")
+        print(f"  LDG.E:          {r['LDG']}")
+        print(f"  STG.E:          {r['STG']}")
+        if r["syscall_refs"]:
+            print(f"  ELF syscall refs ({len(r['syscall_refs'])}):")
+            for h in r["syscall_refs"][:5]:
                 print(f"    {h}")
             verdict_clean = False
         else:

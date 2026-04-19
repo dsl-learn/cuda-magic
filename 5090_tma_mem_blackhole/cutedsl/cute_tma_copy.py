@@ -10,14 +10,21 @@ Why this avoids the 5090 / SM120 `shared::cluster` memory leak:
   baked into the ELF, so the driver never pre-allocates the ~3.7 GiB buffer.
 
 Run:
-  python cute_tma_copy.py
+  python cutedsl/cute_tma_copy.py
 """
 
 import os
-import subprocess
+import sys
 from pathlib import Path
 
+# Allow `import common` from a sibling directory.
+ROOT = Path(__file__).parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import torch
+
+from common.cuda_utils import verify_no_syscall
 
 # Pin the CUTE DSL cache + dump locations to a single repo-local folder so the
 # generated cubin is easy to find for post-hoc verification. Set these BEFORE
@@ -183,44 +190,6 @@ def main():
 
     ok = torch.equal(A, B)
     print(f"identity copy correct: {ok}")
-
-
-def verify_no_syscall(cache_root: Path) -> None:
-    """Assert the emitted cubins don't reference any TMA cluster-scope syscall.
-
-    On 5090, the presence of `__cuda_syscall_cp_async_bulk_tensor_*` in the ELF
-    symbol table is what makes the driver pre-allocate the ~3.7 GiB buffer at
-    kernel load. We want every cubin to come up clean.
-    """
-    cubins = sorted(cache_root.glob("*.cubin"))
-    print(f"\n=== cubin scan ({cache_root}) ===")
-    if not cubins:
-        print("no cubin found; set CUTE_DSL_KEEP_CUBIN=1 and re-run.")
-        return
-    bad = False
-    for cubin in cubins:
-        try:
-            out = subprocess.check_output(
-                ["cuobjdump", "--dump-elf-symbols", str(cubin)],
-                stderr=subprocess.STDOUT,
-            ).decode("utf-8", errors="replace")
-        except FileNotFoundError:
-            print("cuobjdump not in PATH; skipping ELF symbol scan.")
-            return
-        except subprocess.CalledProcessError as e:
-            print(f"{cubin.name}: cuobjdump failed\n{e.output.decode()}")
-            bad = True
-            continue
-        hits = [ln for ln in out.splitlines() if "cuda_syscall" in ln]
-        if hits:
-            bad = True
-            print(f"{cubin.name}: FOUND syscall refs — would leak on 5090:")
-            for h in hits:
-                print(f"  {h.strip()}")
-        else:
-            print(f"{cubin.name}: clean (no __cuda_syscall_* symbols)")
-    if bad:
-        raise SystemExit("at least one cubin still references cluster-scope TMA syscall")
 
 
 if __name__ == "__main__":

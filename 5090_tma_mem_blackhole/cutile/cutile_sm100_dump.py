@@ -10,10 +10,15 @@ captures before ptxas assembles.
 """
 import os
 import shutil
+import sys
 from pathlib import Path
 
+ROOT = Path(__file__).parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 BASE = Path(__file__).parent
-os.environ["PTX_DUMP_DIR"] = str(BASE.parent / "ptx_dumps_sm100")
+os.environ["PTX_DUMP_DIR"] = str(BASE / "cutile_sm100_ptx_cache")
 Path(os.environ["PTX_DUMP_DIR"]).mkdir(exist_ok=True)
 
 CACHE = BASE / "cutile_sm100_cache"
