@@ -20,14 +20,14 @@ Modes:
               driver syscall buffer (the black hole)
 
 Usage -- legacy single-process (run each mode in a SEPARATE process):
-  python triton/gluon_tma_copy.py --mode plain
-  python triton/gluon_tma_copy.py --mode tma_cluster
+  python sm120_tma_mem_blackhole/triton/tma_copy.py --mode plain
+  python sm120_tma_mem_blackhole/triton/tma_copy.py --mode tma_cluster
 
 Usage -- process-isolation (parent spawns a fresh child per mode, SIGKILLs
 after launch, verifies the 3.7 GiB is fully returned on ctx teardown --
 same methodology as experiment_memleak_ctx_bound.py):
-  python triton/gluon_tma_copy.py --isolate
-  python triton/gluon_tma_copy.py --isolate --mode tma_cluster
+  python sm120_tma_mem_blackhole/triton/tma_copy.py --isolate
+  python sm120_tma_mem_blackhole/triton/tma_copy.py --isolate --mode tma_cluster
 
 Expected -- legacy mode (d measures *only* the blackhole, baselined after
 tensors are allocated):
@@ -41,7 +41,7 @@ Expected -- isolate mode (d(T0-T2) is the full parent-visible delta, so it
   reclaim(T4-T0) ~ 0 for every mode -- SIGKILL returns all memory.
 
 To see the workaround (PTX patch shared::cluster -> shared::cta), run:
-  python triton/tma_cta_patch.py
+  python sm120_tma_mem_blackhole/triton/tma_cta_patch.py
 """
 
 import argparse

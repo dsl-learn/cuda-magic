@@ -10,7 +10,7 @@ Why this avoids the 5090 / SM120 `shared::cluster` memory leak:
   baked into the ELF, so the driver never pre-allocates the ~3.7 GiB buffer.
 
 Run:
-  python cutedsl/cute_tma_copy.py
+  python sm120_tma_mem_blackhole/cutedsl/cute_tma_copy.py
 """
 
 import os

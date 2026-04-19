@@ -8,7 +8,7 @@ re-assembles via ptxas, and launches through the CUDA driver API. It proves
 the leak is purely scope-related and has zero perf cost.
 
 Usage:
-  python triton/tma_cta_patch.py
+  python sm120_tma_mem_blackhole/triton/tma_cta_patch.py
 """
 
 import argparse
