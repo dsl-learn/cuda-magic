@@ -1,11 +1,11 @@
 # Usage:
 #   # Run the TMA variant
-#   python sm120_tma_mem_blackhole.py --kernel tma    2>&1 | tee tma.log
+#   python 5090_tma_mem_blackhole.py --kernel tma    2>&1 | tee tma.log
 #
 #   # Run the plain (non-TMA) variant — must be a FRESH process, otherwise
 #   # the CUDA context / Triton runtime is already warm and the one-time
 #   # memory cost we're trying to measure won't show up.
-#   python sm120_tma_mem_blackhole.py --kernel plain  2>&1 | tee plain.log
+#   python 5090_tma_mem_blackhole.py --kernel plain  2>&1 | tee plain.log
 #
 # Then compare the "nvml Δ vs baseline" line between tma.log and plain.log
 # to see how much of the extra device-memory usage is TMA-specific vs generic
