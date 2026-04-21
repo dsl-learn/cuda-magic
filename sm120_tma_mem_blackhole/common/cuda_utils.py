@@ -1,5 +1,26 @@
 """CUDA diagnostics: cuobjdump resolution, cubin extraction, SASS/ELF analysis."""
 
+import torch
+
+
+def warmup_cuda_context() -> None:
+    """Force CUDA context creation so NVML baseline is stable across runs."""
+    torch.cuda.init()
+    _ = torch.empty(1, device="cuda")
+    del _
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
+
+
+def make_triton_allocator():
+    """Return a Triton allocator backed by torch.empty()."""
+    def alloc_fn(size, alignment, stream):
+        return torch.empty(size, device="cuda", dtype=torch.int8)
+    return alloc_fn
+
+
+
 import shutil
 import sqlite3
 import subprocess
