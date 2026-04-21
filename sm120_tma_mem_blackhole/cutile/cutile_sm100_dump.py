@@ -1,13 +1,17 @@
 """
-Force cuTile to codegen for sm_100 on an sm_120 host, to check whether
-the matmul kernel (which has `num_ctas=ct.ByTarget(sm_100=2)`) triggers
-`.multicast::cluster` or other cluster-scope TMA on Blackwell-datacenter.
+Dump cuTile PTX forced to sm_100 codegen on an sm_120 host.
 
-We monkeypatch `cuda.tile._compile.get_sm_arch` to return 'sm_100a', which
-makes tileiras target sm_100 for cubin emission. The actual launch on the
-local sm_120 device will fail, but we only need the PTX that the wrapper
-captures before ptxas assembles.
+Monkey-patches cuda.tile._compile.get_sm_arch to return "sm_100" so the
+compiler targets Blackwell-datacenter instead of the local RTX 5090 (sm_120).
+
+This checks whether cluster-scope TMA (multicast::cluster) appears in the
+PTX when num_ctas=2 is requested. The actual launch on sm_120 will fail,
+but the PTX dump happens before ptxas, so we capture it.
+
+Usage:
+  python sm120_tma_mem_blackhole/cutile/cutile_sm100_dump.py
 """
+
 import os
 import shutil
 import sys
@@ -18,8 +22,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 BASE = Path(__file__).parent
-os.environ["PTX_DUMP_DIR"] = str(BASE / "cutile_sm100_ptx_cache")
-Path(os.environ["PTX_DUMP_DIR"]).mkdir(exist_ok=True)
+PTX_DIR = BASE / "cutile_sm100_ptx_cache"
+PTX_DIR.mkdir(exist_ok=True)
+os.environ["PTX_DUMP_DIR"] = str(PTX_DIR)
 
 CACHE = BASE / "cutile_sm100_cache"
 if CACHE.exists():
@@ -34,9 +39,7 @@ import cuda.tile._compile as _comp
 _cext.default_tile_context.config.cache_dir = str(CACHE)
 
 # Force sm_100 codegen
-_orig = _comp.get_sm_arch
 _comp.get_sm_arch = lambda: "sm_100"
-print(f"forced get_sm_arch: {_comp.get_sm_arch()}")
 
 ConstInt = ct.Constant[int]
 
@@ -62,19 +65,25 @@ def main():
     A = torch.randn(M, K, dtype=torch.bfloat16, device="cuda")
     B = torch.randn(K, N, dtype=torch.bfloat16, device="cuda")
     C = torch.empty(M, N, dtype=torch.bfloat16, device="cuda")
-    stream = torch.cuda.current_stream()
-    grid = (M // TM, N // TN, 1)
+
     try:
-        ct.launch(stream, grid, matmul_sm100, (A, B, C, TM, TN, TK))
+        ct.launch(
+            torch.cuda.current_stream(),
+            (M // TM, N // TN, 1),
+            matmul_sm100, (A, B, C, TM, TN, TK),
+        )
         torch.cuda.synchronize()
     except Exception as e:
-        # Expected: running sm_100 cubin on sm_120 device will fail,
-        # but the PTX was already dumped by the wrapper.
-        print(f"launch/sync failed (expected on sm_120 host): {type(e).__name__}: {str(e)[:200]}")
+        print(f"launch failed (expected on sm_120 host): {type(e).__name__}: {str(e)[:200]}")
 
-    print("\n=== dumped PTX ===")
-    for p in sorted(Path(os.environ["PTX_DUMP_DIR"]).glob("*.ptx")):
-        print(f"  {p}  ({p.stat().st_size} bytes)")
+    print("=== dumped PTX ===")
+    for p in sorted(PTX_DIR.glob("*.ptx")):
+        text = p.read_text()
+        cluster = text.count("shared::cluster")
+        multicast = text.count("multicast::cluster")
+        print(f"  {p.name}  ({p.stat().st_size} bytes)")
+        print(f"    shared::cluster:   {cluster}")
+        print(f"    multicast::cluster: {multicast}")
 
 
 if __name__ == "__main__":
