@@ -6,7 +6,7 @@ Same methodology as triton/blackhole_at_launch.py, but uses raw
 nvidia-cuda-python bindings instead of Triton's driver utils.
 
 Usage:
-  python sm120_tma_mem_blackhole/cuda_bind/experiment_driver_blackhole.py
+  python sm120_tma_mem_blackhole/cuda_bind/driver_blackhole.py
 """
 
 import sys

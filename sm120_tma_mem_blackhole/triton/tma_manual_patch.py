@@ -1,24 +1,23 @@
 """
-Workaround: post-compile PTX patch to replace shared::cluster with shared::cta.
+Manual PTX patch workaround: replace shared::cluster with shared::cta.
 
 Triton 3.4-3.6 emits cp.async.bulk.tensor with shared::cluster scope by
 default, which triggers a ~3.7 GiB driver-side allocation on SM120 (RTX 5090).
-This script compiles the same kernel, sed-replaces cluster->cta in the PTX,
-re-assembles via ptxas, and launches through the CUDA driver API. It proves
-the leak is purely scope-related and has zero perf cost.
+This script compiles the kernel, sed-replaces cluster->cta in the PTX,
+re-assembles via ptxas, and launches through the raw CUDA driver API.
+
+Proves the leak is purely scope-related and has zero perf cost.
 
 Usage:
-  python sm120_tma_mem_blackhole/triton/tma_cta_patch.py
+  python sm120_tma_mem_blackhole/triton/tma_manual_patch.py
 """
 
-import argparse
 import ctypes
 import os
 import re
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -26,14 +25,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import torch
-
 import triton
 import triton.language as tl
 
-from common.mem_utils import (
-    fmt_gb, nvml_init, nvml_used, smi_used_bytes,
-    DeviceMemorySampler,
-)
+from common.cuda_utils import warmup_cuda_context
+from common.mem_utils import fmt_gb, nvml_init, nvml_used
 
 DEVICE = triton.runtime.driver.active.get_active_torch_device()
 
@@ -42,7 +38,7 @@ TILE_N = 128
 
 
 # --------------------------------------------------------------------------- #
-# Same kernel as gluon_tma_copy.py's tma_cluster_kernel.
+# Same kernel as tma_copy.py's tma_cluster_kernel.
 # --------------------------------------------------------------------------- #
 @triton.jit
 def tma_cluster_kernel(src_ptr, dst_ptr, M, N,
@@ -185,56 +181,32 @@ def run_patched(a, b):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--shape", nargs=2, type=int, default=[TILE_M, TILE_N],
-                        metavar=("M", "N"))
-    parser.add_argument("--spin-seconds", type=float, default=6.0)
-    args = parser.parse_args()
-
-    M, N = args.shape
-    assert M % TILE_M == 0 and N % TILE_N == 0
-
-    torch.cuda.synchronize()
-    torch.cuda.empty_cache()
-    torch.cuda.reset_peak_memory_stats()
+    warmup_cuda_context()
 
     handle = nvml_init(torch.cuda.current_device())
     nvml_before = nvml_used(handle)
-    print(f"[nvml] BEFORE any alloc: {fmt_gb(nvml_before)}")
+    print(f"[ManualPatch][nvml] BEFORE any alloc: {fmt_gb(nvml_before)}")
 
-    a = torch.randn((M, N), device=DEVICE, dtype=torch.float16)
+    a = torch.randn((TILE_M, TILE_N), device=DEVICE, dtype=torch.float16)
     b = torch.empty_like(a)
     torch.cuda.synchronize()
 
-    print(f"[nvml] after inputs: {fmt_gb(nvml_used(handle))} "
-          f"(d={fmt_gb(nvml_used(handle) - nvml_before)})")
+    nvml_after_inputs = nvml_used(handle)
+    print(f"[ManualPatch][nvml] after inputs: {fmt_gb(nvml_after_inputs)} "
+          f"(d={fmt_gb(nvml_after_inputs - nvml_before)})")
 
-    print(f"\n=== launching PTX-patched TMA (shared::cta), spinning ~{args.spin_seconds:.0f}s ===")
+    print("\n=== launching Manual PTX-patched TMA (shared::cta) ===")
     run_patched(a, b)
-    print(f"  right after launch (pre-sync): "
-          f"nvml={fmt_gb(nvml_used(handle))}  "
-          f"smi={fmt_gb(smi_used_bytes(torch.cuda.current_device()))}")
-    for i in range(int(args.spin_seconds)):
-        time.sleep(1.0)
-        print(f"  t+{i+1}s  nvml={fmt_gb(nvml_used(handle))}  "
-              f"smi={fmt_gb(smi_used_bytes(torch.cuda.current_device()))}")
     torch.cuda.synchronize()
-    nvml_after = nvml_used(handle)
-    print(f"  after sync: nvml={fmt_gb(nvml_after)} "
-          f"(d vs baseline={fmt_gb(nvml_after - nvml_before)})")
 
-    print("\n=== 20 more launches (steady state) ===")
-    sampler = DeviceMemorySampler(torch.cuda.current_device(), interval_s=0.002)
-    sampler.start()
-    for _ in range(20):
-        run_patched(a, b)
-    torch.cuda.synchronize()
-    sampler.stop()
-    print(f"[nvml] peak over 20 launches: {fmt_gb(sampler.peak())} "
-          f"(d vs baseline={fmt_gb(sampler.peak() - nvml_before)})")
+    nvml_after = nvml_used(handle)
+    print(f"[ManualPatch][nvml] after launch: {fmt_gb(nvml_after)} "
+          f"(d vs baseline={fmt_gb(nvml_after - nvml_before)})")
+    print(f"\n[ManualPatch] Black hole jump (launch - inputs): "
+          f"{fmt_gb(nvml_after - nvml_after_inputs)}")
 
     ok = torch.equal(a, b)
-    print(f"\n{'OK' if ok else 'MISMATCH'}: identity copy "
+    print(f"{'OK' if ok else 'MISMATCH'}: identity copy "
           f"{'matches' if ok else 'does NOT match'} torch")
 
 
