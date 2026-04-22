@@ -39,3 +39,8 @@ cmake-build-*
 .DS_Store
 
 ptx_dumps/
+*_cache/
+*.log
+*.ptx
+*.cubin
+cache.db
